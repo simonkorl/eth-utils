@@ -1,0 +1,1 @@
+kill `ps -ef | grep geth | awk '{print $2}'`

@@ -11,7 +11,7 @@ shift
 # logs are output to a date-tagged file for each run , while a link is
 # created to the latest, so that monitoring be easier with the same filename
 # TODO: use this if GETH not set
-# GETH=geth
+GETH=geth
 
 # geth CLI params       e.g., (dd=04, run=09)
 datetag=`date "+%c%y%m%d-%H%M%S"|cut -d ' ' -f 5`
@@ -21,8 +21,10 @@ linklog=$root/log/$dd.current.log     # /tmp/eth/04.09.log
 stablelog=$root/log/$dd.log     # /tmp/eth/04.09.log
 password=$dd            # 04
 port=311$dd              # 30304
-rpcport=82$dd            # 8104
+httpport=82$dd            # 8104
+networkid=1145$dd         # 114504
 
+mkdir -p $root/tmp
 mkdir -p $root/data
 mkdir -p $root/log
 ln -sf "$log" "$linklog"
@@ -32,8 +34,9 @@ ln -sf "$log" "$linklog"
 if [ ! -d "$root/keystore/$dd" ]; then
   echo create an account with password $dd [DO NOT EVER USE THIS ON LIVE]
   mkdir -p $root/keystore/$dd
-  $GETH --datadir $datadir --password <(echo -n $dd) account new
-# create account with password 00, 01, ...
+  echo -n $dd > $root/tmp/password$dd.tmp
+  $GETH --datadir $datadir --password $root/tmp/password$dd.tmp account new
+  # create account with password 00, 01, ...
   # note that the account key will be stored also separately outside
   # datadir
   # this way you can safely clear the data directory and still keep your key
@@ -60,22 +63,28 @@ BZZKEY=`$GETH --datadir=$datadir account list|head -n1|perl -ne '/([a-f0-9]{40})
 # - launching json-rpc server on port 81dd (like 8100, 8101, 8102, ...)
 echo "$GETH --datadir=$datadir \
   --identity="$dd" \
-  --bzzaccount=$BZZKEY --bzzport=86$dd \
-  --port=$port \
   --unlock=$BZZKEY \
-  --password=<(echo -n $dd) \
-  --rpc --rpcport=$rpcport --rpccorsdomain='*' $* \
-  2>&1 | tee "$stablelog" > "$log" &  # comment out if you pipe it to a tty etc.
+  --networkid=$networkid \
+  --password=$root/tmp/password$dd.tmp \
+  --ipcdisable \
+  --http.port=$httpport \
+  --nat=extip:127.0.0.1 \
+  $*\
+  2>> $log
 "
 
 $GETH --datadir=$datadir \
   --identity="$dd" \
-  --bzzaccount=$BZZKEY --bzzport=86$dd \
   --port=$port \
   --unlock=$BZZKEY \
-  --password=<(echo -n $dd) \
-  --rpc --rpcport=$rpcport --rpccorsdomain='*' $* \
-   2>&1 | tee "$stablelog" > "$log" &  # comment out if you pipe it to a tty etc.
+  --networkid=$networkid \
+  --ipcdisable \
+  --http.port=$httpport \
+  --password=$root/tmp/password$dd.tmp \
+  --nat=extip:127.0.0.1 \
+  $* \
+  2>> $log
+  # 2>&1 | tee "$stablelog" > "$log" # comment out if you pipe it to a tty etc.
 
 # to bring up logs, uncomment
 # tail -f $log
